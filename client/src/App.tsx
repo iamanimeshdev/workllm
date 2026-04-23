@@ -42,7 +42,27 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [showMemory, setShowMemory] = useState(false)
   const [memoryRefreshKey, setMemoryRefreshKey] = useState(0)
+  const [isWakingUp, setIsWakingUp] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+
+  // ── Wake-up check (Render cold starts) ──
+  useEffect(() => {
+    const checkHealth = async () => {
+      const timeout = setTimeout(() => setIsWakingUp(true), 1500)
+      try {
+        const res = await fetch(`${API_BASE}/api/health`)
+        if (res.ok) {
+          clearTimeout(timeout)
+          setIsWakingUp(false)
+        }
+      } catch (err) {
+        // Server might be down or waking up
+      }
+    }
+    checkHealth()
+  }, [API_BASE])
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -77,7 +97,7 @@ function App() {
     try {
       const conversationHistory = buildConversationHistory()
 
-      const res = await fetch('/api/chat', {
+      const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -168,6 +188,16 @@ function App() {
           </div>
         </div>
       </header>
+
+      {/* ── Wake-up notification ── */}
+      {isWakingUp && (
+        <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-1.5 flex items-center justify-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+          <span className="text-[10px] font-medium text-amber-400 uppercase tracking-wider">
+            Render is waking up the server... Please wait a moment.
+          </span>
+        </div>
+      )}
 
       {/* ── Chat area ── */}
       <ScrollArea className="flex-1">
