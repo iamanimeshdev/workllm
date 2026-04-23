@@ -17,7 +17,7 @@ const allowedOrigins = [
 ].filter(Boolean);
 
 app.use(cors({
-  origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
+  origin: true,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
