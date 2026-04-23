@@ -154,8 +154,8 @@ function App() {
       <header className="shrink-0 border-b border-border bg-card/50 backdrop-blur-xl">
         <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-cyan-500 flex items-center justify-center shadow-md">
-              <Sparkles className="h-4 w-4 text-white" />
+            <div className="w-8 h-8 rounded-lg bg-card border border-border flex items-center justify-center shadow-sm overflow-hidden">
+              <img src="https://workllm.io/wp-content/uploads/2026/01/fav-Icon-Color.svg" alt="WorkLLM" className="w-5 h-5 object-contain" />
             </div>
             <div>
               <h1 className="text-sm font-bold">WorkLLM</h1>
@@ -265,6 +265,7 @@ function App() {
       {/* ── Memory panel (slide-over) ── */}
       {showMemory && (
         <MemoryPanel
+          apiBase={API_BASE}
           refreshKey={memoryRefreshKey}
           onClose={() => setShowMemory(false)}
         />

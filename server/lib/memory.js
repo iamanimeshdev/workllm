@@ -2,7 +2,39 @@
 // Memory Store — Simple in-memory key-value storage
 // ============================================================
 
-const memoryStore = new Map();
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const MEMORY_FILE = path.join(__dirname, '../../memories.json');
+
+// Initialize memory from file or empty Map
+let memoryStore = new Map();
+
+function loadFromDisk() {
+  try {
+    if (fs.existsSync(MEMORY_FILE)) {
+      const data = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8'));
+      memoryStore = new Map(Object.entries(data));
+      console.log(`📂 Loaded ${memoryStore.size} memories from disk`);
+    }
+  } catch (error) {
+    console.error('Failed to load memories from disk:', error);
+  }
+}
+
+function saveToDisk() {
+  try {
+    const data = Object.fromEntries(memoryStore);
+    fs.writeFileSync(MEMORY_FILE, JSON.stringify(data, null, 2));
+  } catch (error) {
+    console.error('Failed to save memories to disk:', error);
+  }
+}
+
+// Initial load
+loadFromDisk();
 
 /**
  * Save a memory entry
@@ -16,6 +48,7 @@ export function storeMemory(key, value) {
     value,
     created_at: new Date().toISOString(),
   });
+  saveToDisk();
   console.log(`💾 Memory saved: "${normalizedKey}" = "${value}"`);
 }
 
@@ -63,6 +96,7 @@ export function getAllMemories() {
  */
 export function clearMemory() {
   memoryStore.clear();
+  saveToDisk();
   console.log('🗑️  All memories cleared');
 }
 

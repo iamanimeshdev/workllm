@@ -5,26 +5,28 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 
 interface Memory { key: string; value: string; created_at: string }
-interface MemoryPanelProps { refreshKey: number; onClose: () => void }
+interface MemoryPanelProps { apiBase: string; refreshKey: number; onClose: () => void }
 
-export function MemoryPanel({ refreshKey, onClose }: MemoryPanelProps) {
+export function MemoryPanel({ apiBase, refreshKey, onClose }: MemoryPanelProps) {
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetchMemories = async () => {
     try {
-      const res = await fetch('/api/memory')
+      const res = await fetch(`${apiBase}/api/memory`)
       const data = await res.json()
       setMemories(data.memories || [])
     } catch (e) { console.error('Failed to fetch memories:', e) }
     finally { setLoading(false) }
   }
 
-  useEffect(() => { fetchMemories() }, [refreshKey])
+  useEffect(() => { fetchMemories() }, [refreshKey, apiBase])
 
   const clearAll = async () => {
-    try { await fetch('/api/memory', { method: 'DELETE' }); setMemories([]) }
-    catch (e) { console.error('Failed to clear:', e) }
+    try { 
+      await fetch(`${apiBase}/api/memory`, { method: 'DELETE' }); 
+      setMemories([]) 
+    } catch (e) { console.error('Failed to clear:', e) }
   }
 
   return (
