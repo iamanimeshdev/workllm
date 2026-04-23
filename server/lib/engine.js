@@ -9,7 +9,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const MAX_ITERATIONS = 6; // Safety limit to prevent infinite loops
+const MAX_ITERATIONS = 10; // Increased limit for multi-step tasks
 
 /**
  * Call the LLM via OpenRouter and get a raw string response
@@ -88,7 +88,7 @@ function parseLLMResponse(raw) {
  * Validate the parsed JSON against our expected schema
  */
 function validateResponse(parsed) {
-  const validTools = ['send_email', 'draft_email', 'schedule_meeting', 'store_memory', 'recall_memory'];
+  const validTools = ['send_email', 'draft_email', 'schedule_meeting', 'store_memory', 'recall_memory', 'final_answer'];
 
   if (!parsed.tool || !validTools.includes(parsed.tool)) {
     throw new Error(`Invalid tool: "${parsed.tool}". Must be one of: ${validTools.join(', ')}`);
@@ -96,6 +96,7 @@ function validateResponse(parsed) {
 
   // Ensure required fields exist with defaults
   return {
+    thought: parsed.thought || null,
     tool: parsed.tool,
     confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0.5,
     args: parsed.args || {},
@@ -117,7 +118,6 @@ export async function processMessage(userMessage, conversationHistory = []) {
   let iteration = 0;
   let isComplete = false;
   let finalResponse = null;
-  let pendingContext = null; // Extra context from recall_memory etc.
 
   // Build conversation for LLM
   const memorySnapshot = getMemorySnapshot();
@@ -142,22 +142,12 @@ export async function processMessage(userMessage, conversationHistory = []) {
     iteration++;
     console.log(`\n── Iteration ${iteration}/${MAX_ITERATIONS} ──`);
 
-    // If we have pending context (e.g. from recall_memory), inject it
-    if (pendingContext) {
-      llmMessages.push({
-        role: 'assistant',
-        content: JSON.stringify(pendingContext.lastParsed),
-      });
-      llmMessages.push({
-        role: 'user',
-        content: `Tool result for ${pendingContext.tool}: ${pendingContext.result}\n\nNow continue with the original user request using this information. Respond with a new JSON action.`,
-      });
-      pendingContext = null;
-    }
-
     try {
       // 1. Call LLM
       const rawResponse = await callLLM(llmMessages);
+
+      // Append assistant's response to history
+      llmMessages.push({ role: 'assistant', content: rawResponse });
 
       // 2. Parse JSON
       const parsed = parseLLMResponse(rawResponse);
@@ -165,11 +155,36 @@ export async function processMessage(userMessage, conversationHistory = []) {
       // 3. Validate
       const validated = validateResponse(parsed);
 
+      console.log(`🧠 Thought: ${validated.thought || 'None'}`);
       console.log(`🎯 Tool: ${validated.tool} | Confidence: ${validated.confidence}`);
       console.log(`📋 Args: ${JSON.stringify(validated.args)}`);
       console.log(`❓ Missing: ${JSON.stringify(validated.missing_fields)}`);
 
-      // 4. Check for missing fields → return follow-up question
+      // 4. Check for final_answer
+      if (validated.tool === 'final_answer') {
+        const step = {
+          iteration,
+          tool: validated.tool,
+          confidence: validated.confidence,
+          args: validated.args,
+          missing_fields: [],
+          follow_up_question: null,
+          status: 'executed',
+          result: 'Task complete',
+        };
+        steps.push(step);
+
+        finalResponse = {
+          type: 'success',
+          message: validated.args.message || 'I have completed the task.',
+          steps,
+          total_iterations: iteration,
+        };
+        isComplete = true;
+        continue;
+      }
+
+      // 5. Check for missing fields → return follow-up question
       if (validated.missing_fields.length > 0) {
         const step = {
           iteration,
@@ -193,75 +208,22 @@ export async function processMessage(userMessage, conversationHistory = []) {
         continue;
       }
 
-      // 5. Handle memory tools specially
+      // 6. Execute tools
+      let toolResultStr = '';
       if (validated.tool === 'store_memory') {
         const { key, value } = validated.args;
         storeMemory(key, value);
-
-        const step = {
-          iteration,
-          tool: 'store_memory',
-          confidence: validated.confidence,
-          args: validated.args,
-          missing_fields: [],
-          follow_up_question: null,
-          status: 'executed',
-          result: `Remembered: "${key}" = "${value}"`,
-        };
-        steps.push(step);
-
-        finalResponse = {
-          type: 'success',
-          message: `Got it! I'll remember that ${key} is "${value}".`,
-          steps,
-          total_iterations: iteration,
-        };
-        isComplete = true;
-        continue;
+        toolResultStr = `Remembered: "${key}" = "${value}"`;
+      } else if (validated.tool === 'recall_memory') {
+        const { key, query } = validated.args;
+        const searchKey = query || key || '';
+        const recalled = recallMemory(searchKey);
+        toolResultStr = recalled
+          ? `Found: "${recalled.key}" = "${recalled.value}"`
+          : `No memory found for "${searchKey}"`;
+      } else {
+        toolResultStr = await executeTool(validated.tool, validated.args);
       }
-
-      if (validated.tool === 'recall_memory') {
-        const { key } = validated.args;
-        const recalled = recallMemory(key);
-
-        const step = {
-          iteration,
-          tool: 'recall_memory',
-          confidence: validated.confidence,
-          args: validated.args,
-          missing_fields: [],
-          follow_up_question: null,
-          status: 'executed',
-          result: recalled
-            ? `Found: "${recalled.key}" = "${recalled.value}"`
-            : `No memory found for "${key}"`,
-        };
-        steps.push(step);
-
-        if (recalled) {
-          // Feed the recalled info back and loop for the next action
-          pendingContext = {
-            tool: 'recall_memory',
-            result: `${recalled.key} = ${recalled.value}`,
-            lastParsed: validated,
-          };
-          console.log(`🔄 Memory recalled, looping back to resolve original request...`);
-          continue; // Don't mark as complete — loop again
-        } else {
-          // No memory found — ask the user
-          finalResponse = {
-            type: 'follow_up',
-            message: `I don't have any saved information about "${key}". Could you provide it?`,
-            steps,
-            total_iterations: iteration,
-          };
-          isComplete = true;
-          continue;
-        }
-      }
-
-      // 6. Execute the tool (send_email, draft_email, schedule_meeting)
-      const toolResult = await executeTool(validated.tool, validated.args);
 
       const step = {
         iteration,
@@ -271,17 +233,16 @@ export async function processMessage(userMessage, conversationHistory = []) {
         missing_fields: [],
         follow_up_question: null,
         status: 'executed',
-        result: toolResult,
+        result: toolResultStr,
       };
       steps.push(step);
 
-      finalResponse = {
-        type: 'success',
-        message: toolResult,
-        steps,
-        total_iterations: iteration,
-      };
-      isComplete = true;
+      // Feed result back to LLM to continue loop
+      console.log(`🔄 Tool executed. Looping back with result...`);
+      llmMessages.push({
+        role: 'user',
+        content: `System: Tool execution result for ${validated.tool}: ${toolResultStr}\n\nContinue with the next step. If all tasks are complete, use the 'final_answer' tool. Respond with ONLY a valid JSON object.`
+      });
 
     } catch (error) {
       console.error(`❌ Iteration ${iteration} error:`, error.message);

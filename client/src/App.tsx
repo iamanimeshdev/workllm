@@ -182,9 +182,9 @@ function App() {
                   <MessageBubble role={msg.role} content={msg.content} />
 
                   {/* Tool execution steps (only for assistant messages with response data) */}
-                  {msg.role === 'assistant' && msg.response && msg.response.steps.length > 0 && (
+                  {msg.role === 'assistant' && msg.response && msg.response.steps.filter(s => s.tool !== 'final_answer').length > 0 && (
                     <div className="space-y-2">
-                      {msg.response.steps.map((step, i) => (
+                      {msg.response.steps.filter(s => s.tool !== 'final_answer').map((step, i) => (
                         <ActionCard key={`${msg.id}-step-${i}`} step={step} index={i} />
                       ))}
                     </div>

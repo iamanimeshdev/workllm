@@ -29,5 +29,8 @@ export const schemas = {
   }),
   recall_memory: z.object({
     query: z.string().describe("Search keyword(s) to find relevant saved memories"),
+  }),
+  final_answer: z.object({
+    message: z.string().describe("The final message to display to the user once all tasks are complete"),
   })
 };
