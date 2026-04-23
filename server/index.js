@@ -28,7 +28,7 @@ app.get('/api/health', (req, res) => {
 app.listen(PORT, () => {
   console.log(`
   ╔══════════════════════════════════════════╗
-  ║   🤖 AI Assistant Server                ║
+  ║   🤖 WorkLLM Server                     ║
   ║   Running on http://localhost:${PORT}       ║
   ║   Model: ${(process.env.OPENROUTER_MODEL || 'meta-llama/llama-4-maverick:free').substring(0, 30).padEnd(30)} ║
   ║   Mode: Strict JSON + While-Loop        ║

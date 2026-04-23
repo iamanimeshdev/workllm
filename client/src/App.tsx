@@ -56,8 +56,8 @@ function App() {
   const buildConversationHistory = () => {
     return messages.map(msg => ({
       role: msg.role,
-      content: msg.role === 'user' 
-        ? msg.content 
+      content: msg.role === 'user'
+        ? msg.content
         : msg.response?.message || msg.content,
     }))
   }
@@ -138,7 +138,7 @@ function App() {
               <Sparkles className="h-4 w-4 text-white" />
             </div>
             <div>
-              <h1 className="text-sm font-bold">AI Assistant</h1>
+              <h1 className="text-sm font-bold">WorkLLM</h1>
               <p className="text-[10px] text-muted-foreground">
                 Email • Calendar • Memory
               </p>
