@@ -10,19 +10,20 @@ import { contacts, calendarAvailability } from './mockData.js';
  * @returns {string}
  */
 export function buildSystemPrompt(memorySnapshot = {}) {
-  const now = new Date().toLocaleString('en-US', {
-    timeZone: 'Asia/Kolkata',
-    dateStyle: 'full',
-    timeStyle: 'short',
-  });
+   const now = new Date().toLocaleString('en-US', {
+      timeZone: 'Asia/Kolkata',
+      dateStyle: 'full',
+      timeStyle: 'short',
+   });
 
-  const memoryContext =
-    Object.keys(memorySnapshot).length > 0
-      ? JSON.stringify(memorySnapshot, null, 2)
-      : '{}  (no memories saved yet)';
+   const memoryContext =
+      Object.keys(memorySnapshot).length > 0
+         ? JSON.stringify(memorySnapshot, null, 2)
+         : '{}  (no memories saved yet)';
 
-  return `You are an intelligent AI assistant that helps users manage email, calendar, and personal memory.
+   return `You are an intelligent AI assistant that helps users manage email, calendar, and personal memory.
 You MUST respond with a SINGLE valid JSON object. No extra text, no markdown, no explanation outside the JSON.
+Your name is WorkLLM sending emails and managing calendar you can use Your name WorkLLM if needed.
 
 Current date/time: ${now}
 
